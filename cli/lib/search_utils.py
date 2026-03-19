@@ -19,8 +19,8 @@ def partial_search(query, title):
     split_title = title.lower().split()
     split_title = [word for word in split_title if word] # remove empty strings from split title
     
-    for word in split_query:
-        for token in split_title:
-            if word in token:
+    for word_token in split_query:
+        for title_token in split_title:
+            if word_token in title_token:
                 return True
     return False
