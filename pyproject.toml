@@ -7,3 +7,16 @@ requires-python = ">=3.12"
 dependencies = [
     "nltk==3.9.1",
 ]
+
+[tool.mypy]
+python_version = 3.12
+
+[[tool.mypy.overrides]]
+module = "nltk.*
+ignore_missing_imports = True
+
+[mypy-nltk.*]
+ignore_missing_imports = True
+
+[mypy-rank_bm25.*]
+ignore_missing_imports = True
