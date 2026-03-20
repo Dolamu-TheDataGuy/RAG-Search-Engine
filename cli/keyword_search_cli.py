@@ -6,7 +6,22 @@ import json
 from lib.keyword_search import search_command as ks
 from lib.search_utils import stem_word
 
+
 def main() -> None:
+    """Entry point for the Keyword Search CLI.
+
+    Parses command-line arguments and dispatches to the appropriate command.
+    Currently supports the following command:
+
+    - ``search <query>``: Stems the query and retrieves ranked movie results via BM25.
+
+    Example:
+        .. code-block:: bash
+
+            $ python app.py search "inception"
+            1. Inception
+            2. The Dark Inception
+    """
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -24,7 +39,7 @@ def main() -> None:
                 print(f"{i}. {res['title']}")
         case _:
             parser.print_help()
-    
+
 
 if __name__ == "__main__":
     main()
