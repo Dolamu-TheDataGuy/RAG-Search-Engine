@@ -4,6 +4,7 @@ import argparse
 import json
 
 from lib.keyword_search import search_command as ks
+from lib.search_utils import stem_word
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
@@ -17,7 +18,8 @@ def main() -> None:
     match args.command:
         case "search":
             print(f"Searching for: {args.query}")
-            results = ks(args.query)
+            stemmed_query = stem_word(args.query)
+            results = ks(stemmed_query)
             for i, res in enumerate(results, start=1):
                 print(f"{i}. {res['title']}")
         case _:

@@ -1,5 +1,6 @@
 import json
 import os
+from nltk.stem import PorterStemmer
 
 DEFAULT_SEARCH_LIMIT = 5
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -68,3 +69,16 @@ def partial_search(query: str, title: str) -> bool:
             if word_token in title_token:
                 return True
     return False
+
+
+def stem_word(query: str) -> str:
+    """Stem a word to its base form using the Porter Stemmer algorithm.
+
+    Args:
+        query (str): The word to stem.
+
+    Returns:
+        str: The stemmed form of the word.
+    """
+    stemmer = PorterStemmer()
+    return stemmer.stem(query)
