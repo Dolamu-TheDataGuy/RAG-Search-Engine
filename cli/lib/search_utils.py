@@ -1,6 +1,5 @@
 import json
 import os
-from nltk.stem import PorterStemmer
 
 DEFAULT_SEARCH_LIMIT = 5
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,42 +42,4 @@ def load_movies() -> list[dict]:
     return data["movies"]
 
 
-def partial_search(query: str, title: str) -> bool:
-    """Check if any query word partially matches any word in a movie title.
-
-    Tokenizes and lowercases both the query and title, strips stopwords,
-    then checks for substring matches between the two token sets.
-
-    Args:
-        query (str): The user's search query.
-        title (str): The movie title to match against.
-
-    Returns:
-        bool: True if at least one query token is a substring of a title token,
-            False otherwise.
-    """
-    split_query = [word for word in query.lower().split() if word]
-    split_title = [word for word in title.lower().split() if word]
-
-    stopwords = load_stopwords()
-    split_query = [word for word in split_query if word not in stopwords]
-    split_title = [word for word in split_title if word not in stopwords]
-
-    for word_token in split_query:
-        for title_token in split_title:
-            if word_token in title_token:
-                return True
-    return False
-
-
-def stem_word(query: str) -> str:
-    """Stem a word to its base form using the Porter Stemmer algorithm.
-
-    Args:
-        query (str): The word to stem.
-
-    Returns:
-        str: The stemmed form of the word.
-    """
-    stemmer = PorterStemmer()
-    return stemmer.stem(query)
+56

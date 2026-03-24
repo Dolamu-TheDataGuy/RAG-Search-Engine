@@ -3,9 +3,7 @@
 import argparse
 import json
 
-from lib.keyword_search import search_command as ks
-from lib.search_utils import stem_word
-
+from lib.keyword_search import search_command, tokenize_text
 
 def main() -> None:
     """Entry point for the Keyword Search CLI.
@@ -33,12 +31,24 @@ def main() -> None:
     match args.command:
         case "search":
             print(f"Searching for: {args.query}")
-            stemmed_query = stem_word(args.query)
-            results = ks(stemmed_query)
+            results = search_command(args.query)
             for i, res in enumerate(results, start=1):
                 print(f"{i}. {res['title']}")
         case _:
             parser.print_help()
+
+
+class InvertedIndex:
+    def __init__(self):
+        self.index = {}
+        self.docmap = {}
+        
+    def __add_document(self, doc_id: int, text: str) -> None:
+        for word in tokenize_text(text):
+            if word not in self.index:
+                self.index[word] = set()
+            self.index[word].add(doc_id)
+
 
 
 if __name__ == "__main__":
