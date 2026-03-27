@@ -11,12 +11,3 @@ dependencies = [
 [tool.mypy]
 python_version = 3.12
 
-[[tool.mypy.overrides]]
-module = "nltk.*
-ignore_missing_imports = True
-
-[mypy-nltk.*]
-ignore_missing_imports = True
-
-[mypy-rank_bm25.*]
-ignore_missing_imports = True

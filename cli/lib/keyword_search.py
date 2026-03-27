@@ -1,7 +1,10 @@
 import string
 from nltk.stem import PorterStemmer
+import os
+import pickle
+from collections import defaultdict
 
-from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords
+from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords, CACHE_DIR
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -29,6 +32,13 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
                 break
     return results
 
+
+def build_command() -> None:
+    idx = InvertedIndex()
+    idx.build()
+    idx.save()
+    docs = idx.get_documents("merida")
+    print(f"First document for token 'merida' = {docs[0]}")
 
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
@@ -68,3 +78,47 @@ def tokenize_text(text:str) -> list[str]:
         stemmed_words.append(stemmer.stem(word))
         
     return list(set(stemmed_words))
+
+
+class InvertedIndex:
+    def __init__(self):
+        self.index = defaultdict(set) # maps each tokenized text to a set of docs_id
+        self.docmap = dict[int, dict] = {} # maps movies id to the movie object as per movie.json
+        self.index_path = os.path.join(CACHE_DIR, "index.pkl")
+        self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        
+        
+    def __add_document(self, doc_id: int, text: str) -> None:
+        for word in tokenize_text(text):
+            if word not in self.index:
+                self.index[word] = set()
+            self.index[word].add(doc_id)
+
+    def get_documents(self, term):
+        tokens = tokenize_text(term)
+        if not tokens:
+            return []
+        token = tokens[0]
+        doc_ids = self.index.get(token, set())
+        return sorted(doc_ids)
+        
+    
+    def build(self):
+        movies = load_movies()
+        
+        for movie in movies:
+            self.docmap[movie["id"]] = movie
+            
+            self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
+            
+    
+    def save(self):
+        # when working with relative directory, we set file path based on current working directory which is where the script/process is run.
+        # we run our script (cli/keyword_search_cli.py) from root directory, so that means "cache" is created in root directory.fffff
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        
+        with open(self.index_path, "wb") as f:
+            pickle.dump(self.index, f)
+            
+        with open(self.docmap_path, "wb") as f:
+            pickle.dump(self.docmap, f)

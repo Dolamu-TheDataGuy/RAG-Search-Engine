@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 
 import argparse
-import json
+import os
+import pickle
 
-from lib.keyword_search import search_command, tokenize_text
+from lib.keyword_search import search_command, build_command
+from lib.search_utils import load_movies
+
 
 def main() -> None:
     """Entry point for the Keyword Search CLI.
@@ -22,8 +25,10 @@ def main() -> None:
     """
     parser = argparse.ArgumentParser(description="Keyword Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    subparsers.add_parser("build", help="Build Inverted index algorithm")
 
     search_parser = subparsers.add_parser("search", help="Search movies using BM25")
+
     search_parser.add_argument("query", type=str, help="Search query")
 
     args = parser.parse_args()
@@ -34,21 +39,12 @@ def main() -> None:
             results = search_command(args.query)
             for i, res in enumerate(results, start=1):
                 print(f"{i}. {res['title']}")
+        case "build":
+            print("Building Inverted index....")
+            build_command()
+            print("Inverted index built successfully.")
         case _:
             parser.print_help()
-
-
-class InvertedIndex:
-    def __init__(self):
-        self.index = {}
-        self.docmap = {}
-        
-    def __add_document(self, doc_id: int, text: str) -> None:
-        for word in tokenize_text(text):
-            if word not in self.index:
-                self.index[word] = set()
-            self.index[word].add(doc_id)
-
 
 
 if __name__ == "__main__":
