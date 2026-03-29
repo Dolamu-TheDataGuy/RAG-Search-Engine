@@ -3,6 +3,7 @@ from nltk.stem import PorterStemmer
 import os
 import pickle
 from collections import defaultdict
+from collections import Counter
 
 from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords, CACHE_DIR
 
@@ -44,10 +45,21 @@ def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
                         return results
     return results
 
+
 def build_command() -> None:
     idx = InvertedIndex()
     idx.build()
     idx.save()
+
+
+def tf_command(doc_id: int, term: str) -> int:
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing")
+        return 0
+    return idx.get_tf(doc_id, term)
 
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
@@ -86,7 +98,7 @@ def tokenize_text(text:str) -> list[str]:
     for word in filtered_words:
         stemmed_words.append(stemmer.stem(word))
         
-    return list(set(stemmed_words))
+    return stemmed_words
 
 
 class InvertedIndex:
@@ -95,13 +107,26 @@ class InvertedIndex:
         self.docmap = {} # maps movies id to the movie object as per movie.json
         self.index_path = os.path.join(CACHE_DIR, "index.pkl")
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
+        self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
+        self.term_frequencies = defaultdict(Counter) # maps docs_id to a Counter object (dictionary of token: frequency)
+
 
     def __add_document(self, doc_id: int, text: str) -> None:
-        for word in tokenize_text(text):
+        tokens = tokenize_text(text)
+        for word in tokens:
             if word not in self.index:
                 self.index[word] = set()
             self.index[word].add(doc_id)
+        
+        term_counter = Counter(tokens)
+        self.term_frequencies[doc_id] = term_counter
 
+    def get_tf(self, doc_id, term):
+        tokenized_term = tokenize_text(term)
+        term_counter = self.term_frequencies.get(doc_id, {})
+        return term_counter.get(tokenized_term[0], 0) if tokenized_term else 0
+    
+        
     def get_documents(self, term):
         tokens = tokenize_text(term)
         if not tokens:
@@ -110,6 +135,7 @@ class InvertedIndex:
         doc_ids = self.index.get(token, set())
         return sorted(doc_ids)
 
+
     def build(self):
         movies = load_movies() 
 
@@ -117,6 +143,7 @@ class InvertedIndex:
             self.docmap[movie["id"]] = movie
 
             self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
+
 
     def save(self):
         # when working with relative directory, we set file path based on current working directory which is where the script/process is run.
@@ -129,6 +156,10 @@ class InvertedIndex:
         with open(self.docmap_path, "wb") as f:
             pickle.dump(self.docmap, f)
 
+        with open(self.term_frequencies_path, "wb") as f:
+            pickle.dump(self.term_frequencies, f)
+
+
     def load(self):
         try:
             with open(self.index_path, "rb") as f:
@@ -136,5 +167,9 @@ class InvertedIndex:
 
             with open(self.docmap_path, "rb") as f:
                 self.docmap = pickle.load(f)
+
+            with open(self.term_frequencies_path, "rb") as f:
+                self.term_frequencies = pickle.load(f)
+
         except FileNotFoundError:
             raise FileNotFoundError("File does not exist")
