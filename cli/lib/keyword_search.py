@@ -1,4 +1,5 @@
 import string
+import math
 from nltk.stem import PorterStemmer
 import os
 import pickle
@@ -74,6 +75,24 @@ def tf_command(doc_id: int, term: str) -> int:
         return 0
     return idx.get_tf(doc_id, term)
 
+
+def idf_command(term: str) -> float:
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing")
+    return idx.get_idf(term)
+
+
+def tf_idf_command(doc_id: int, term: str) -> float:
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing in cache folder")
+        return 0.0
+    return idx.get_tf_idf(doc_id, term)
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
     """
@@ -197,20 +216,6 @@ class InvertedIndex:
         term_counter = Counter(tokens)
         self.term_frequencies[doc_id] = term_counter
 
-    def get_tf(self, doc_id: int, term: str) -> int:
-        """
-        Returns the term frequency of a term within a document.
-
-        Args:
-            doc_id (int): Target document ID.
-            term (str): Raw term to look up.
-
-        Returns:
-            int: Frequency count of the term in the document, or 0 if not found.
-        """
-        tokenized_term = tokenize_text(term)
-        term_counter = self.term_frequencies.get(doc_id, {})
-        return term_counter.get(tokenized_term[0], 0) if tokenized_term else 0
 
     def get_documents(self, term: str) -> list[int]:
         """
@@ -229,6 +234,51 @@ class InvertedIndex:
         doc_ids = self.index.get(token, set())
         return sorted(doc_ids)
 
+
+    def get_tf(self, doc_id: int, term: str) -> int:
+        """
+        Returns the term frequency of a term within a document.
+
+        Args:
+            doc_id (int): Target document ID.
+            term (str): Raw term to look up.
+
+        Returns:
+            int: Frequency count of the term in the document, or 0 if not found.
+        """
+        tokenized_term = tokenize_text(term)
+        if len(tokenized_term) != 1:
+            raise ValueError("Term must tokenize to exactly one token")
+
+        term_counter = self.term_frequencies.get(doc_id, {})
+        return term_counter.get(tokenized_term[0], 0) if tokenized_term else 0
+
+
+    def get_idf(self, term: str) -> float:
+        """
+        Returns the inverse document frequency of a term across the corpus.
+
+        Args:
+            term (str): Raw term to look up.
+
+        Returns:
+            float: IDF score, or 0 if term is not found in any document.
+        """
+        tokenized_term = tokenize_text(term)
+        if len(tokenized_term) != 1:
+            raise ValueError("Term must tokenize to exactly one token")
+
+        total_doc_count = len(self.docmap)
+        term_doc_count = len(self.index.get(tokenized_term[0], []))
+        return math.log((total_doc_count + 1) / (term_doc_count + 1))
+
+
+    def get_tf_idf(self, doc_id: int, term: str) -> float:
+        tf = self.get_tf(doc_id, term)
+        idf = self.get_idf(term)
+        return tf * idf
+   
+    
     def build(self) -> None:
         """
         Loads movies and builds the index and docmap from scratch.
