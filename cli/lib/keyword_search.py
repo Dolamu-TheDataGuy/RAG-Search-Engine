@@ -6,7 +6,7 @@ import pickle
 from collections import defaultdict
 from collections import Counter
 
-from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords, CACHE_DIR
+from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords, CACHE_DIR, BM25_K1, BM25_B
 
 
 def search_command(query: str, limit: int = DEFAULT_SEARCH_LIMIT) -> list[dict]:
@@ -93,6 +93,27 @@ def tf_idf_command(doc_id: int, term: str) -> float:
         print("Index file is missing in cache folder")
         return 0.0
     return idx.get_tf_idf(doc_id, term)
+
+def bm25_idf_command(term: str) -> float:
+    idx = InvertedIndex()
+    
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing in cache folder")
+        return 0.0
+    return idx.get_bm25_idf(term)
+
+def bm25_tf_command(doc_id: int, term: str) -> float:
+    idx = InvertedIndex()
+    
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing in cache folder")
+        return 0.0
+    return idx.get_bm25_tf(doc_id, term)
+
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
     """
@@ -198,6 +219,9 @@ class InvertedIndex:
         self.docmap_path = os.path.join(CACHE_DIR, "docmap.pkl")
         self.term_frequencies_path = os.path.join(CACHE_DIR, "term_frequencies.pkl")
         self.term_frequencies = defaultdict(Counter)
+        self.doc_lengths = {}
+        self.doc_lengths_path = os.path.join(CACHE_DIR, "doc_lengths.pkl")
+        
 
     def __add_document(self, doc_id: int, text: str) -> None:
         """
@@ -208,6 +232,7 @@ class InvertedIndex:
             text (str): Raw text to tokenize and index.
         """
         tokens = tokenize_text(text)
+        self.doc_lengths[doc_id] = len(tokens)
         for word in tokens:
             if word not in self.index:
                 self.index[word] = set()
@@ -278,7 +303,24 @@ class InvertedIndex:
         idf = self.get_idf(term)
         return tf * idf
    
+   
+    def get_bm25_idf(self, term: str) -> float:
+        
+        tokenize_term = tokenize_text(term)
+        if len(tokenize_term) != 1:
+            raise ValueError("Term must tokenize to exactly one token")
+        
+        total_doc_count = len(self.docmap)
+        term_doc_count = len(self.index.get(tokenize_term[0], []))
+        return math.log((total_doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
     
+    
+    def get_bm25_tf(self, doc_id, term, k1=BM25_K1):
+        tf = self.get_tf(doc_id, term)
+        bm25_tf = (tf * (k1 + 1)) / (tf + k1)
+        return bm25_tf
+
+
     def build(self) -> None:
         """
         Loads movies and builds the index and docmap from scratch.
