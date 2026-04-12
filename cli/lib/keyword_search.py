@@ -5,6 +5,7 @@ import os
 import pickle
 from collections import defaultdict
 from collections import Counter
+from typing import Dict
 
 from lib.search_utils import DEFAULT_SEARCH_LIMIT, load_movies, load_stopwords, CACHE_DIR, BM25_K1, BM25_B
 
@@ -113,6 +114,15 @@ def bm25_tf_command(doc_id: int, term: str) -> float:
         print("Index file is missing in cache folder")
         return 0.0
     return idx.get_bm25_tf(doc_id, term)
+
+def bm25_search_command(query, limit=DEFAULT_SEARCH_LIMIT) -> list[dict]:
+    idx = InvertedIndex()
+    try:
+        idx.load()
+    except FileNotFoundError:
+        print("Index file is missing in cache folder")
+        return []
+    return idx.bm25_search(query, limit)
 
 
 def has_matching_tokens(query_tokens: list[str], title_tokens: list[str]) -> bool:
@@ -237,7 +247,6 @@ class InvertedIndex:
             if word not in self.index:
                 self.index[word] = set()
             self.index[word].add(doc_id)
-
         term_counter = Counter(tokens)
         self.term_frequencies[doc_id] = term_counter
 
@@ -315,12 +324,39 @@ class InvertedIndex:
         return math.log((total_doc_count - term_doc_count + 0.5) / (term_doc_count + 0.5) + 1)
     
     
-    def get_bm25_tf(self, doc_id, term, k1=BM25_K1):
+    def get_bm25_tf(self, doc_id, term, k1=BM25_K1, b=BM25_B) -> float:
+        length_norm = 1 - b + b * (self.doc_lengths.get(doc_id, 0) / self.__get_avg_doc_length())
         tf = self.get_tf(doc_id, term)
-        bm25_tf = (tf * (k1 + 1)) / (tf + k1)
+        bm25_tf = (tf * (k1 + 1)) / (tf + k1 * length_norm)
         return bm25_tf
+    
+    def bm25(self, doc_id: int, term: str):
+        bm25_idf = self.get_bm25_idf(term)
+        bm25_tf = self.get_bm25_tf(doc_id, term)
+        return bm25_tf * bm25_idf
+    
+    def bm25_search(self, query: str, limit: int):
+        query_tokens = tokenize_text(query)
+        doc_scores = {}
+        for query_token in query_tokens:
+            for doc_id in self.docmap:
+                score = self.bm25(doc_id, query_token)
+                if doc_id in doc_scores:
+                    doc_scores[doc_id] += score
+                else:
+                    doc_scores[doc_id] = score 
+        sorted_docs = sorted(doc_scores.items(), key=lambda x: x[1], reverse=True)
+        return [(doc_id, self.docmap[doc_id], score) for doc_id, score in sorted_docs[:limit]] if sorted_docs else []
 
 
+    def __get_avg_doc_length(self) -> float:
+        if not self.doc_lengths:
+            return 0.0
+        total_length = sum(self.doc_lengths.values())
+        avg_length = total_length / len(self.doc_lengths)
+        return avg_length
+ 
+    
     def build(self) -> None:
         """
         Loads movies and builds the index and docmap from scratch.
@@ -330,6 +366,7 @@ class InvertedIndex:
         for movie in movies:
             self.docmap[movie["id"]] = movie
             self.__add_document(movie["id"], f"{movie['title']} {movie['description']}")
+
 
     def save(self) -> None:
         """
@@ -345,6 +382,10 @@ class InvertedIndex:
 
         with open(self.term_frequencies_path, "wb") as f:
             pickle.dump(self.term_frequencies, f)
+            
+        with open(self.doc_lengths_path, "wb") as f:
+            pickle.dump(self.doc_lengths, f)
+
 
     def load(self) -> None:
         """
@@ -362,6 +403,9 @@ class InvertedIndex:
 
             with open(self.term_frequencies_path, "rb") as f:
                 self.term_frequencies = pickle.load(f)
+            
+            with open(self.doc_lengths_path, "rb") as f:
+                self.doc_lengths = pickle.load(f)
 
         except FileNotFoundError:
             raise FileNotFoundError("File does not exist")
