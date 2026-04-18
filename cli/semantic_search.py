@@ -43,7 +43,23 @@ class SemanticSearch:
         else:
             print("No cached embeddings found. Building new embeddings.")
             self.build_embeddings(documents)
+    
 
+    def search(self, query, limit):
+        if self.embeddings is None:
+            raise ValueError("No embeddings loaded. Call `load_or_create_embeddings` first.")
+    
+        query_embedding = self.generate_embedding(query)
+        similarities_store = []
+    
+        for idx, doc_embedding in enumerate(self.embeddings):
+            similarities_store.append((self.documents[idx], cosine_similarity(query_embedding, doc_embedding)))
+    
+        # Sort by similarity (descending) and return top `limit` results
+        similarities_store.sort(key=lambda x: x[1], reverse=True)
+        return similarities_store[:limit]
+    
+    
 
 def verify_model():
     semantic_search = SemanticSearch()
@@ -66,4 +82,51 @@ def verify_embedding():
     semanticsearch.load_or_create_embeddings(movies)
     print(f"Number of docs: {len(semanticsearch.documents)}")
     print(f"Embedding shape: {semanticsearch.embeddings.shape[0]} vectors in {semanticsearch.embeddings.shape[1]} dimensions")
+
+
+def embed_query(query:str)-> None:
+    semanticsearch = SemanticSearch()
+    query_embedding = semanticsearch.generate_embedding(query)
+    print(f"Query: {query}")
+    print(f"First 3 dimensions: {query_embedding[:3]}")
+    print(f"Shape: {query_embedding.shape}")
+
+
+def cosine_similarity(vec1, vec2):
+    dot_product = np.dot(vec1, vec2)
+    norm1 = np.linalg.norm(vec1)
+    norm2 = np.linalg.norm(vec2)
     
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    
+    return dot_product / (norm1 * norm2)
+
+
+def search_command(query, limit):
+    semanticsearch = SemanticSearch()
+    movies = load_movies()
+    semanticsearch.load_or_create_embeddings(movies)
+    return semanticsearch.search(query, limit)
+
+def chunking_command(text, chunk_size, overlap):
+    chunks = []
+    splitted_text = text.split()
+    
+    # For loop approach with overlap
+    # for i in range(0, len(splitted_text), chunk_size - overlap):
+    #     chunk = splitted_text[i:i+chunk_size]
+    #     chunks.append(" ".join(chunk))
+    # return chunks
+    
+    # while loop approach with overlap : works better for small texts and edge cases
+    start = 0
+    while start+overlap < len(splitted_text):
+        end = start + chunk_size
+        chunk = splitted_text[start:end]
+        chunks.append(" ".join(chunk))
+        if overlap > 0:
+            start += chunk_size - overlap
+        else:
+            start += chunk_size
+    return chunks
