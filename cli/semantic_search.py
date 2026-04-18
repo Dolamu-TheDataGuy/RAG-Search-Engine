@@ -1,6 +1,6 @@
 import numpy as np
 import os
-
+import re
 from sentence_transformers import SentenceTransformer
 from lib.search_utils import load_movies
 
@@ -58,8 +58,7 @@ class SemanticSearch:
         # Sort by similarity (descending) and return top `limit` results
         similarities_store.sort(key=lambda x: x[1], reverse=True)
         return similarities_store[:limit]
-    
-    
+
 
 def verify_model():
     semantic_search = SemanticSearch()
@@ -129,4 +128,19 @@ def chunking_command(text, chunk_size, overlap):
             start += chunk_size - overlap
         else:
             start += chunk_size
+    return chunks
+
+
+def semantic_chunk(text, max_chunk_size, overlap):
+    splitted_text = re.split(r'(?<=[.!?])\s+', text)
+    chunks = []
+    start = 0
+    while start + overlap < len(splitted_text):
+        end = start + max_chunk_size
+        chunk = splitted_text[start:end]
+        chunks.append(" ".join(chunk))
+        if overlap > 0:
+            start += max_chunk_size - overlap
+        else:
+            start += max_chunk_size
     return chunks
