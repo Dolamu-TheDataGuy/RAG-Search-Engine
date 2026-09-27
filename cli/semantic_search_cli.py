@@ -1,11 +1,12 @@
 import argparse
-from semantic_search import embed_query, verify_embedding, verify_model, embed_text, search_command, chunking_command, semantic_chunk
+from semantic_search import embed_query, verify_embedding, verify_model, embed_text, search_command, chunking_command, semantic_chunk, embed_chunks
 
 
 def main():
     parser = argparse.ArgumentParser(description="Semantic Search CLI")
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     subparsers.add_parser("verify", help="Get term frequency for a document and term")
+    embed_chunk_parser = subparsers.add_parser("embed_chunks", help="Generate embeddings for document chunks")
     embed_text_parser = subparsers.add_parser("embed_text", help="Generate embedding for a given text")
     embed_text_parser.add_argument("text", type=str, help="Text to generate embedding for")
     subparsers.add_parser("verify_embeddings", help="Verify if our embeddings are correct")
@@ -51,6 +52,9 @@ def main():
             print(f"Semantically chunking {len(args.text)} characters")
             for idx, chunk in enumerate(chunks, start=1):
                 print(f"{idx}. {chunk}\n") 
+        case "embed_chunks":
+            chunk_embedding_obj = embed_chunks()
+            print(f"Generated {len(chunk_embedding_obj.chunk_embeddings)} chunked embeddings")
         case _:
             parser.print_help()
 

@@ -1,5 +1,8 @@
+from typing import Any
+
 import numpy as np
 import os
+import json
 import re
 from sentence_transformers import SentenceTransformer
 from lib.search_utils import load_movies
@@ -58,6 +61,61 @@ class SemanticSearch:
         # Sort by similarity (descending) and return top `limit` results
         similarities_store.sort(key=lambda x: x[1], reverse=True)
         return similarities_store[:limit]
+
+
+class ChunkedSemanticSearch(SemanticSearch):
+    def __init__(self, model_name = "all-MiniLM-L6-v2") -> None:
+        super().__init__(model_name)
+        self.chunk_embeddings = None
+        self.chunk_metadata = None
+
+    def build_chunk_embeddings(self, documents):
+        self.documents = documents
+        all_chunks = []
+        chunk_metadata = []
+        for document in documents:
+            if not document:
+                continue
+            doc_chunks = semantic_chunk(document["description"], max_chunk_size=4, overlap=1)
+            # print(doc_chunks)
+            for chunk in doc_chunks:
+                all_chunks.append(chunk)
+
+            for idx, chunk in enumerate(doc_chunks):
+                chunk_metadata.append(
+                    {
+                        "movie_idx": document["id"],
+                        "chunk_idx": idx,
+                        "total_chunks": len(doc_chunks)
+                    }
+                )
+        self.chunk_embeddings = self.model.encode(all_chunks, show_progress_bar=True)
+        self.chunk_metadata = chunk_metadata
+
+        np.save("cache/chunk_embeddings.npy", self.chunk_embeddings)
+
+        with open("cache/chunk_metadata.json", "w") as f:
+            json.dump({"chunks": chunk_metadata, "total_chunks": len(all_chunks)}, f, indent=2)
+
+        return self.chunk_embeddings
+
+    def load_or_create_chunk_embeddings(self, documents: list[dict]) -> np.ndarray:
+        self.documents = documents
+        for document in documents:
+            self.document_map[document["id"]] = document
+            
+        if os.path.exists("cache/chunk_embeddings.npy") and os.path.exists("cache/chunk_metadata.json"):
+            self.chunk_embeddings = np.load("cache/chunk_embeddings.npy")
+            with open("cache/chunk_metadata.json", "r") as f:
+                metadata = json.load(f)
+                self.chunk_metadata = metadata["chunks"]
+            return self.chunk_embeddings
+
+        
+        print("No cached chunk embeddings found. Building new chunk embeddings.")
+        return self.build_chunk_embeddings(documents)
+            
+        
 
 
 def verify_model():
@@ -144,3 +202,10 @@ def semantic_chunk(text, max_chunk_size, overlap):
         else:
             start += max_chunk_size
     return chunks
+
+def embed_chunks():
+    movies = load_movies()
+    chunk_semantic_search = ChunkedSemanticSearch()
+    chunk_semantic_search.load_or_create_chunk_embeddings(movies)
+    return chunk_semantic_search
+

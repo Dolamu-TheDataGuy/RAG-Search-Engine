@@ -180,7 +180,7 @@ def tokenize_text(text: str) -> list[str]:
 
     Example:
         >>> tokenize_text("The running foxes are quickly jumping")
-        ['run', 'fox', 'quickli', 'jump']
+        ['run', 'fox', 'quickly', 'jump']
     """
     text = preprocess_text(text)
     tokens = text.split()
